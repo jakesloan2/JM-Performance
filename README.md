@@ -14,7 +14,7 @@ assets/
   css/styles.css
   img/jm-logo.png           ← extracted from your artwork, transparent background
   img/jm-logo-sm.png        ← favicon
-  js/vehicle-data.js        ← 22 makes / 112 models / 438 engines
+  js/vehicle-data.js        ← 27 makes / 284 models / 968 engines, current to 2026
   js/app.js                 ← CONFIG block is at the top
 ```
 
@@ -25,14 +25,50 @@ assets/
 ### `assets/js/app.js` (top of file)
 
 ```js
-phoneDisplay : '028 9100 0000',        // ← real number
-phoneDial    : '+442891000000',        // ← same number, international format
-email        : 'info@jmperformance.co.uk',
+phoneDisplay  : '07801 265432',        // ← set (mobile only, no landline)
+phoneDial     : '+447801265432',       // ← set
+mobileDisplay : '07801 265432',        // ← set
+mobileDial    : '+447801265432',       // ← set
+messageChannel: 'whatsapp',            // ← 'whatsapp' or 'sms'
+email         : 'Joshmcmaster1234@gmail.com',   // ← set
+reviewUrl     : null,                  // ← see section 2
 lookupEndpoint : null,                 // ← see section 3
 formEndpoint   : null                  // ← see section 4
 ```
 
-This one block feeds every phone link, email link and the sticky call bar.
+This one block feeds every phone link, email link, the sticky mobile bar and
+the "Send details" message.
+
+**`mobileDial` must be in full international format** — `+447712345678`, not
+`07712345678`. WhatsApp will not open on a number starting with 0.
+
+### The "Send details" button
+
+The sticky bar on phones and tablets has two halves: **Call now** (dials
+`mobileDial`) and **Send details** (opens WhatsApp or SMS with a message
+already written). The message looks like this:
+
+```
+Hi JM Performance, I'd like a quote.
+
+Your name:
+Phone:
+Email:
+Registration:
+Your town:
+What I'm after: Stage 1 remap
+Anything else:
+```
+
+It fills itself in as they go. If they've typed anything into the contact form,
+those values appear. If they've run the reg checker and tapped "Book this map",
+the registration and the vehicle come through automatically. Whatever's left
+blank they complete on their phone before hitting send — so you always get the
+same seven pieces of information in the same order, which makes quoting fast.
+
+To switch from WhatsApp to a normal text, set `messageChannel: 'sms'`.
+WhatsApp is the default because the link is more reliable across phones and
+you get read receipts.
 
 ### `index.html` — find and replace
 
@@ -47,20 +83,42 @@ Also update `robots.txt` and `sitemap.xml` with the real domain.
 
 ---
 
-## 2. Reviews and ratings — read this bit
+## 2. Reviews — how to add them
 
-The six reviews and the `aggregateRating` in the structured data are
-**placeholders**. Replace them with real ones before launch.
+There are **no reviews and no ratings on the site**, deliberately. The
+`aggregateRating` markup is gone from the structured data too.
 
-Publishing invented reviews with `aggregateRating` markup is a manual-action
-risk with Google and, in the UK, falls foul of the Digital Markets,
-Competition and Consumers Act 2024 — fake reviews carry real penalties now.
-Once you have genuine Google reviews, paste the real text in and set
-`ratingCount` to the actual number.
+Under the UK Digital Markets, Competition and Consumers Act 2024, publishing
+fake or incentivised reviews is unlawful and carries real penalties. Google also
+issues manual actions for `aggregateRating` markup not backed by genuine
+reviews. For a new business an honest "we're just starting out" reads better
+than five suspiciously glowing testimonials anyway.
 
-The "2,400+ vehicles tuned", "35% max power gain" and "15% fuel savings"
-figures in the stats band are the same deal — set them to numbers you can
-stand over.
+**To switch the review button on:** in your Google Business Profile go to
+*Read reviews → Get more reviews*, copy the short link, paste it into
+`reviewUrl` in `app.js`. The button stays hidden until you do.
+
+**To add real reviews:** open the `#reviews` section in `index.html`. There is a
+commented-out `.reviews-grid` with a template `<figure>`. Delete the
+`.reviews-empty` block, uncomment the grid, and copy the figure once per
+review. Use the customer's actual words and their real first name and town.
+
+**Once you have genuine reviews you can add the rating back.** Put this inside
+the business node in the JSON-LD, with numbers matching your real Google
+profile exactly:
+
+```json
+"aggregateRating": {
+  "@type": "AggregateRating",
+  "ratingValue": "4.9",
+  "bestRating": "5",
+  "ratingCount": "23"
+},
+```
+
+The stats band no longer claims vehicle counts or percentages either. It now
+shows four things that are true from day one: VAG specialism, custom files,
+stock file archived, 30-day guarantee.
 
 ---
 
@@ -133,9 +191,33 @@ updates. Adding a vehicle is one line:
 Types: `td` turbo diesel, `tp` turbo petrol, `na` naturally aspirated petrol,
 `nad` naturally aspirated diesel.
 
+Models are sorted newest-first inside each make, and every make ends with a
+"Mine isn't listed — ask us" option that jumps to the contact form with the
+make and reg pre-filled. Full hybrids and EVs are deliberately not in the
+database — the scope for conventional ECU tuning is limited and it would be
+dishonest to quote gains for them.
+
+**Keep this file current.** Generation ranges go stale fast. Every year or so,
+add the new generations and change any `(20XX on)` label to a closed range once
+that generation ends. Models are grouped by nameplate with the newest
+generation first, so a customer on a current car sees it immediately.
+
+Anything released after mid-2026 will need adding by hand — check the figures
+against the manufacturer's own spec sheet before you trust them, especially
+on brand-new platforms.
+
 ---
 
 ## 6. What's already done for SEO and AEO
+
+**Positioning**
+- Title, meta description and hero all lead with "ECU remapping specialist" and
+  "VAG specialist"
+- A dedicated `#vag` section naming the brands and the actual engine and gearbox
+  codes (EA189, EA288, EA211, EA888, DQ250, DQ381, DL382) — that is what people
+  search once they know what they are driving
+- `knowsAbout` and `slogan` in the schema, a VAG service in the offer catalogue,
+  and a specialism FAQ
 
 **On-page**
 - One `<h1>`, clean `<h2>` hierarchy, semantic sectioning
@@ -184,7 +266,132 @@ the `compliance-note` paragraph directly below the cards.
 
 ---
 
-## 8. Deploying
+## 8. Pre-launch checklist — all 20 done
+
+| # | Item | Status |
+|---|---|---|
+| 1 | Privacy policy | `privacy.html` — UK GDPR, lawful bases, retention, ICO details |
+| 2 | Terms page | `terms.html` — guide figures, warranty/insurance duty, 30-day guarantee, liability |
+| 3 | Clear CTA | Reg checker in the hero, sticky call/message bar, CTA in every section |
+| 4 | FAQ | 13 questions, all in FAQPage schema |
+| 5 | robots.txt | Allows all, names the AI crawlers, points at the sitemap |
+| 6 | sitemap.xml | Home, privacy, terms |
+| 7 | Custom 404 | `404.html` — noindex, links to the six main sections |
+| 8 | Alt text | Every image checked; decorative loader logo correctly `alt=""` |
+| 9 | Analytics | `consent.js` — Plausible or GA4, loads only after consent |
+| 10 | Meta titles | Unique per page, lead with the specialism |
+| 11 | Meta descriptions | Unique per page, under 160 chars |
+| 12 | Social share | OG + Twitter cards, 1200×630 image cut from the brand film |
+| 13 | Favicon | SVG + PNG + apple-touch-icon + `site.webmanifest` |
+| 14 | Canonical URLs | On all four pages |
+| 15 | Cookie consent | Banner, nothing set before a choice, reopenable from footer and privacy page |
+| 16 | Mobile version | 8 viewports, zero horizontal overflow |
+| 17 | Accessibility | **axe-core: zero violations on all four pages** |
+| 18 | Test forms | Validation, message building and both send paths tested |
+| 19 | Broken links | Every internal link, anchor and asset path verified |
+| 20 | Performance | Lazy video, preloaded fonts, cache headers, dimensioned images |
+
+### What accessibility testing actually found
+
+Five real failures, all fixed:
+
+1. **Contrast** — the dimmest grey (`#6E7889`) failed 4.5:1 on the contact labels. Lifted to `#8B94A6`.
+2. **Contrast** — the 404 button inherited a link colour over blue, giving 1.65:1. Forced white.
+3. **Heading order** — footer `<h4>`s followed an `<h2>`, skipping a level. Now `<h2 class="footer-h">`.
+4. **Link in text block** — inline links were distinguished by colour alone. Now underlined.
+5. **Landmark** — the sticky bar sat outside any landmark. Now a `<nav aria-label="Quick contact">`.
+
+### Analytics — nothing configured, nothing costing
+
+`assets/js/consent.js` has all three options set to `null`. **No analytics
+runs, no cookies are set, and no cookie banner appears** — because with nothing
+configured there is genuinely nothing to consent to. Showing a cookie banner on
+a site that sets no cookies would be misleading.
+
+To turn numbers on, fill in one. The banner appears by itself when needed.
+
+| Option | Cost | Cookie banner? |
+|---|---|---|
+| `ga4Id` | **Free** | Yes — GA4 sets cookies, so it waits for consent |
+| `cfToken` | **Free** | No — Cloudflare Web Analytics is cookieless, loads straight away |
+| `plausible` | ~£7/mo | Yes. Listed for completeness; the two above are free |
+
+Tested in all three states: nothing set → no banner, no scripts. GA4 set →
+banner shows, zero scripts before consent, GA4 loads after accept. Cloudflare
+set → no banner, beacon loads immediately (correct — it sets no cookies).
+
+**My suggestion:** if you host on Cloudflare Pages, use `cfToken`. Free,
+no banner needed, and nobody has to click anything. Otherwise GA4.
+
+### Server config
+
+`_headers` (Cloudflare Pages / Netlify) and `.htaccess` (Apache) are both
+included: one-year immutable caching on assets, no-cache on HTML, `nosniff`,
+frame options, referrer policy, and the 404 mapping. Neither is needed on
+GitHub Pages, which handles 404s automatically from `404.html`.
+
+---
+
+## 9. The loader and the film
+
+**Loader** (`#loader`) mirrors the brand splash: logo, blue rule,
+"Remapping · Diagnostics · ECU Tuning", the domain, and a sweeping progress
+bar. It shows **once per browsing session** — `sessionStorage` keeps it from
+nagging on every page. It dismisses on `load`, has a minimum display of 1.4s so
+it doesn't flash, a **4-second hard ceiling** so a slow asset can never trap
+anyone, and it can be clicked away. Under `prefers-reduced-motion` the
+animation is dropped entirely.
+
+**Film** (`#film`) is your brand animation, converted from the HEVC `.mov`
+(which doesn't play in Chrome or Firefox) into MP4 + WebM:
+
+| | Original | Now |
+|---|---|---|
+| Format | HEVC in .mov | H.264 MP4 + VP9 WebM |
+| Size | 2.6 MB | 575 KB / 615 KB |
+| Support | Safari only | Every browser |
+
+Nothing downloads until the section is 300px from the viewport, and playback
+only starts on click — so the video never costs a visitor data they didn't
+choose to spend. Muted by default with an unmute control, plus a
+`VideoObject` schema entry so it can surface in video search.
+
+To swap the film later, replace both files in `assets/video/` keeping the same
+names, and regenerate the poster:
+
+```bash
+ffmpeg -i new.mov -vf scale=1280:-2 -c:v libx264 -crf 26 -preset slow \
+  -pix_fmt yuv420p -c:a aac -b:a 96k -movflags +faststart assets/video/jm-intro.mp4
+ffmpeg -i new.mov -vf scale=1280:-2 -c:v libvpx-vp9 -crf 36 -b:v 0 \
+  -c:a libopus assets/video/jm-intro.webm
+ffmpeg -ss 12.5 -i new.mov -frames:v 1 -vf scale=1280:-2 assets/video/jm-intro-poster.jpg
+```
+
+---
+
+## 10. What this site costs to run
+
+Nothing, on the setup described here.
+
+| Item | Cost |
+|---|---|
+| Hosting (GitHub Pages or Cloudflare Pages) | Free |
+| SSL certificate | Free, automatic |
+| Google Fonts | Free |
+| Analytics (Cloudflare or GA4) | Free |
+| Google Business Profile | Free |
+| Domain name | ~£10/year, if you don't already own it |
+
+Two **optional** extras would cost money and are switched off:
+
+- **Real reg lookup.** The DVLA API is free but returns no model or power
+  figures, so it needs a paid data provider on top (per-lookup pricing). The
+  vehicle picker does the same job for free and is what's live.
+- **Plausible analytics.** ~£7/month. Cloudflare and GA4 do the job free.
+
+---
+
+## 11. Deploying
 
 Any static host: Netlify, Cloudflare Pages, Vercel, GitHub Pages, or plain
 FTP to shared hosting. Drag the folder in, point the domain at it, done.

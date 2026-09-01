@@ -6,9 +6,24 @@
 const CONFIG = {
   /* Business details — these are written into every phone/email link
      on the page, so change them once here.                          */
-  phoneDisplay : '028 9100 0000',
-  phoneDial    : '+442891000000',
-  email        : 'info@jmperformance.co.uk',
+  phoneDisplay : '07801 265432',
+  phoneDial    : '+447801265432',
+
+  /* Mobile number — used by the sticky bar and the "send details" button. */
+  mobileDisplay : '07801 265432',
+  mobileDial    : '+447801265432',
+
+  /* How the "send details" button delivers the message.
+     'whatsapp' opens WhatsApp with the text ready to send — most reliable.
+     'sms'      opens the normal texting app instead.                       */
+  messageChannel : 'whatsapp',
+
+  email        : 'Joshmcmaster1234@gmail.com',
+
+  /* Google review link. Get it from your Google Business Profile:
+     Read reviews → Get more reviews → copy the short link.
+     Leave null and the review button is hidden.                     */
+  reviewUrl : null,
 
   /* Reg lookup endpoint.
      Leave null and the checker falls back to the manual vehicle
@@ -22,6 +37,44 @@ const CONFIG = {
   formEndpoint : null
 };
 
+/* ═══════════════════════════════════════════════════════════════
+   LOADER
+   Shows once per browsing session. Always dismisses — a hard
+   timeout means a slow asset can never leave someone stuck on it.
+   ═══════════════════════════════════════════════════════════════ */
+(function () {
+  const el = document.getElementById('loader');
+  if (!el) return;
+
+  let seen = false;
+  try { seen = sessionStorage.getItem('jmSeenLoader') === '1'; } catch (e) { /* private mode */ }
+
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (seen) { el.remove(); return; }
+
+  document.body.classList.add('is-loading');
+  let done = false;
+  const dismiss = () => {
+    if (done) return;
+    done = true;
+    try { sessionStorage.setItem('jmSeenLoader', '1'); } catch (e) {}
+    el.classList.add('is-done');
+    document.body.classList.remove('is-loading');
+    setTimeout(() => el.remove(), 700);
+  };
+
+  const minShow = reduce ? 0 : 1400;
+  const start = performance.now();
+  const finish = () => setTimeout(dismiss, Math.max(0, minShow - (performance.now() - start)));
+
+  if (document.readyState === 'complete') finish();
+  else window.addEventListener('load', finish, { once: true });
+
+  setTimeout(dismiss, 4000);            // hard ceiling
+  el.addEventListener('click', dismiss); // let people skip it
+})();
+
 /* ─────────────── helpers ─────────────── */
 const $  = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -29,7 +82,13 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 /* ─────────────── contact details ─────────────── */
 $$('[data-phone-link]').forEach(a => { a.href = 'tel:' + CONFIG.phoneDial; });
 $$('[data-phone-text]').forEach(a => { a.textContent = CONFIG.phoneDisplay; });
+$$('[data-mobile-link]').forEach(a => { if (a.tagName === 'A' && !a.dataset.msgLink) a.href = 'tel:' + CONFIG.mobileDial; });
+$$('[data-mobile-text]').forEach(a => { a.textContent = CONFIG.mobileDisplay + ' (mobile)'; });
 $$('[data-email-link]').forEach(a => { a.href = 'mailto:' + CONFIG.email; a.textContent = CONFIG.email; });
+$$('[data-review-link]').forEach(a => {
+  if (CONFIG.reviewUrl) { a.href = CONFIG.reviewUrl; a.target = '_blank'; a.rel = 'noopener'; }
+  else a.hidden = true;
+});
 const yearEl = $('#year'); if (yearEl) yearEl.textContent = new Date().getFullYear();
 
 /* ─────────────── header / nav ─────────────── */
@@ -50,7 +109,7 @@ $$('#mobileNav a').forEach(a => a.addEventListener('click', () => {
   mobileNav.hidden = true;
 }));
 
-const callBar = $('.mobile-call-bar');
+const callBar = $('#mobileBar');
 let lastY = 0;
 const onScroll = () => {
   const y = window.scrollY;
@@ -100,6 +159,68 @@ function countUp(stat) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   "SEND DETAILS" MESSAGE
+   Builds a ready-to-send message with the enquiry fields laid out.
+   Anything the visitor has already typed (or picked in the checker)
+   is filled in; the rest is left blank for them to complete on their
+   phone before hitting send.
+   ═══════════════════════════════════════════════════════════════ */
+
+const MSG_FIELDS = [
+  ['Your name',    () => val('#cfName')],
+  ['Phone',        () => val('#cfPhone')],
+  ['Email',        () => val('#cfEmail')],
+  ['Registration', () => val('#cfReg')],
+  ['Your town',    () => val('#cfTown')],
+  ['What I\u2019m after', () => val('#cfService')],
+  ['Anything else', () => val('#cfMsg')]
+];
+
+function val(sel) {
+  const el = $(sel);
+  return el && el.value ? el.value.trim() : '';
+}
+
+function buildMessage() {
+  const lines = ['Hi JM Performance, I\u2019d like a quote.', ''];
+  MSG_FIELDS.forEach(([label, get]) => lines.push(label + ': ' + get()));
+  return lines.join('\n');
+}
+
+function sendHref(text) {
+  if (CONFIG.messageChannel === 'sms') {
+    return 'sms:' + CONFIG.mobileDial + '?&body=' + encodeURIComponent(text);
+  }
+  return 'https://wa.me/' + CONFIG.mobileDial.replace(/[^0-9]/g, '') + '?text=' + encodeURIComponent(text);
+}
+
+function messageHref() { return sendHref(buildMessage()); }
+
+/* Message built from a checker result — carries the vehicle and all three
+   sets of figures, then leaves the customer's own details to fill in. */
+function vehicleMessage(r) {
+  const lines = ['Hi JM Performance, I\u2019d like to book this map.', ''];
+  if (r.reg) lines.push('Reg: ' + r.reg);
+  lines.push('Vehicle: ' + r.title, '');
+  lines.push('Standard: ' + r.stock.bhp + ' bhp / ' + r.stock.nm + ' Nm');
+  lines.push('Stage 1: ' + r.s1.bhp + ' bhp / ' + r.s1.nm + ' Nm  (+' + (r.s1.bhp - r.stock.bhp) + ' bhp)');
+  lines.push('Stage 2: ' + r.s2.bhp + ' bhp / ' + r.s2.nm + ' Nm  (+' + (r.s2.bhp - r.stock.bhp) + ' bhp)');
+  lines.push('', 'Which stage: ', 'Your name: ', 'Phone: ', 'Your town: ', 'Anything else: ');
+  return lines.join('\n');
+}
+
+const msgLinks = $$('[data-msg-link]');
+function refreshMessageLinks() { msgLinks.forEach(a => { a.href = messageHref(); }); }
+refreshMessageLinks();
+
+/* Keep the message in step with whatever they type or select */
+['input', 'change'].forEach(ev =>
+  document.addEventListener(ev, (e) => {
+    if (e.target.closest && e.target.closest('#contactForm')) refreshMessageLinks();
+  }, true)
+);
+
+/* ═══════════════════════════════════════════════════════════════
    REG CHECKER
    ═══════════════════════════════════════════════════════════════ */
 
@@ -125,6 +246,7 @@ const els = {
 };
 
 let pendingReg = null;   // reg carried over from the plate into the picker
+let lastResult = null;   // most recent set of figures, for the booking message
 
 /* ── tabs ── */
 function showTab(name) {
@@ -271,6 +393,7 @@ function handoffToPicker(partial) {
 
 /* ── vehicle picker ── */
 const DB = window.JM_VEHICLES || {};
+const SEL_GO_LABEL = els.selGo.innerHTML;
 
 Object.keys(DB).sort((a, b) => a.localeCompare(b, 'en')).forEach(make => {
   els.selMake.append(new Option(make, make));
@@ -278,12 +401,14 @@ Object.keys(DB).sort((a, b) => a.localeCompare(b, 'en')).forEach(make => {
 
 els.selMake.addEventListener('change', () => {
   const make = els.selMake.value;
+  els.selGo.innerHTML = SEL_GO_LABEL;
   els.selModel.innerHTML = '<option value="">Choose model…</option>';
   els.selEngine.innerHTML = '<option value="">Choose engine…</option>';
   els.selEngine.disabled = true;
   els.selGo.disabled = true;
   if (!make) { els.selModel.disabled = true; return; }
   Object.keys(DB[make]).forEach(model => els.selModel.append(new Option(model, model)));
+  els.selModel.append(new Option('Mine isn\u2019t listed \u2014 ask us', '__other'));
   els.selModel.disabled = false;
 });
 
@@ -292,6 +417,13 @@ els.selModel.addEventListener('change', () => {
   els.selEngine.innerHTML = '<option value="">Choose engine…</option>';
   els.selGo.disabled = true;
   if (!model) { els.selEngine.disabled = true; return; }
+  if (model === '__other') {
+    els.selEngine.disabled = true;
+    els.selGo.disabled = false;
+    els.selGo.innerHTML = 'Send us the details';
+    return;
+  }
+  els.selGo.innerHTML = SEL_GO_LABEL;
   DB[make][model].forEach((eng, i) => els.selEngine.append(new Option(eng[0], String(i))));
   els.selEngine.disabled = false;
 });
@@ -300,6 +432,17 @@ els.selEngine.addEventListener('change', () => { els.selGo.disabled = els.selEng
 
 els.selGo.addEventListener('click', () => {
   const make = els.selMake.value, model = els.selModel.value, idx = els.selEngine.value;
+
+  if (model === '__other') {
+    const msg = $('#cfMsg');
+    if (pendingReg) $('#cfReg').value = pendingReg;
+    msg.value = `My ${make} isn't in the list${pendingReg ? ' (reg ' + pendingReg + ')' : ''}. Can you tell me what's available for it?`;
+    refreshMessageLinks();
+    $('#contact').scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => $('#cfName').focus(), 600);
+    return;
+  }
+
   if (!make || !model || idx === '') return;
   const [label, bhp, nm, type] = DB[make][model][idx];
   renderResults({
@@ -338,8 +481,10 @@ function renderResults(v, reg) {
     $$('.result-bar i', els.resTable).forEach(bar => { bar.style.width = bar.dataset.w; });
   });
 
-  els.bookMap.dataset.vehicle = v.title;
-  els.bookMap.dataset.reg = reg || '';
+  lastResult = { title: v.title, reg: reg || '', type: v.type, stock: { bhp: v.bhp, nm: v.nm }, s1, s2 };
+  els.bookMap.href = sendHref(vehicleMessage(lastResult));
+  $('#bookMapLabel').textContent =
+    CONFIG.messageChannel === 'sms' ? 'Book this map by text' : 'Book this map on WhatsApp';
   els.results.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
@@ -358,19 +503,28 @@ function row(name, bhp, nm, gain, cls, peak) {
 els.reset.addEventListener('click', () => {
   els.results.hidden = true;
   pendingReg = null;
+  lastResult = null;
   els.regInput.value = '';
   els.selMake.value = ''; els.selMake.dispatchEvent(new Event('change'));
+  els.selGo.innerHTML = SEL_GO_LABEL;
   els.panelSel.querySelector('.checker-lede').textContent = 'Pick your make, model and engine';
   showTab('reg');
   els.regInput.focus();
 });
 
-/* Carry the checked vehicle into the enquiry form */
-els.bookMap.addEventListener('click', () => {
-  const veh = els.bookMap.dataset.vehicle, reg = els.bookMap.dataset.reg;
-  if (reg) $('#cfReg').value = reg;
+/* Fallback path: carry the checked vehicle into the enquiry form instead */
+$('#bookMapForm').addEventListener('click', () => {
+  if (!lastResult) return;
+  if (lastResult.reg) $('#cfReg').value = lastResult.reg;
   const msg = $('#cfMsg');
-  if (veh && !msg.value) msg.value = `Enquiry about tuning for: ${veh}`;
+  if (!msg.value) {
+    msg.value =
+      `Enquiry about tuning for: ${lastResult.title}\n` +
+      `Standard ${lastResult.stock.bhp} bhp / ${lastResult.stock.nm} Nm · ` +
+      `Stage 1 ${lastResult.s1.bhp} bhp / ${lastResult.s1.nm} Nm · ` +
+      `Stage 2 ${lastResult.s2.bhp} bhp / ${lastResult.s2.nm} Nm`;
+  }
+  refreshMessageLinks();
 });
 
 /* ═══════════════════════════════════════════════════════════════
@@ -433,3 +587,49 @@ form.addEventListener('submit', async (e) => {
     btn.disabled = false; btn.textContent = 'Send enquiry';
   }
 });
+
+
+/* ═══════════════════════════════════════════════════════════════
+   FILM
+   Nothing downloads until the section is in view, and playback
+   only starts when asked — so the video never costs a visitor
+   bandwidth they didn't want to spend.
+   ═══════════════════════════════════════════════════════════════ */
+(function () {
+  const video = $('#introVideo');
+  const play  = $('#filmPlay');
+  const sound = $('#filmSound');
+  if (!video || !play) return;
+
+  let loaded = false;
+  const load = () => { if (!loaded) { loaded = true; video.preload = 'metadata'; video.load(); } };
+
+  if ('IntersectionObserver' in window) {
+    const vo = new IntersectionObserver((es) => {
+      es.forEach(e => { if (e.isIntersecting) { load(); vo.disconnect(); } });
+    }, { rootMargin: '300px' });
+    vo.observe(video);
+  } else load();
+
+  play.addEventListener('click', () => {
+    load();
+    video.play().then(() => {
+      play.hidden = true;
+      sound.hidden = false;
+      video.controls = true;
+    }).catch(() => { video.controls = true; });
+  });
+
+  const frame = video.closest('.film-frame');
+  video.addEventListener('pause', () => { if (!video.ended) play.hidden = false; });
+  video.addEventListener('play',  () => {
+    play.hidden = true; sound.hidden = false;
+    if (frame) frame.classList.add('is-playing');
+  });
+
+  sound.addEventListener('click', () => {
+    video.muted = !video.muted;
+    sound.classList.toggle('is-on', !video.muted);
+    sound.setAttribute('aria-label', video.muted ? 'Unmute the film' : 'Mute the film');
+  });
+})();

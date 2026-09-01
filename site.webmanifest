@@ -1,0 +1,14 @@
+{
+  "name": "JM Performance — ECU Remapping & VAG Specialist",
+  "short_name": "JM Performance",
+  "description": "ECU remapping specialist and VAG tuning workshop in Kircubbin, County Down.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#05070C",
+  "theme_color": "#05070C",
+  "icons": [
+    { "src": "assets/img/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "assets/img/jm-logo-sm.png", "sizes": "293x96", "type": "image/png" },
+    { "src": "assets/img/jm-logo.png", "sizes": "586x192", "type": "image/png" }
+  ]
+}
