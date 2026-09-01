@@ -117,7 +117,7 @@ profile exactly:
 ```
 
 The stats band no longer claims vehicle counts or percentages either. It now
-shows four things that are true from day one: VAG specialism, custom files,
+shows four things that are true from day one: VASS specialism, custom files,
 stock file archived, 30-day guarantee.
 
 ---
@@ -212,11 +212,11 @@ on brand-new platforms.
 
 **Positioning**
 - Title, meta description and hero all lead with "ECU remapping specialist" and
-  "VAG specialist"
-- A dedicated `#vag` section naming the brands and the actual engine and gearbox
+  "VASS specialist"
+- A dedicated `#vass` section naming the brands and the actual engine and gearbox
   codes (EA189, EA288, EA211, EA888, DQ250, DQ381, DL382) — that is what people
   search once they know what they are driving
-- `knowsAbout` and `slogan` in the schema, a VAG service in the offer catalogue,
+- `knowsAbout` and `slogan` in the schema, a VASS service in the offer catalogue,
   and a specialism FAQ
 
 **On-page**
@@ -334,40 +334,45 @@ GitHub Pages, which handles 404s automatically from `404.html`.
 
 ## 9. The loader and the film
 
-**Loader** (`#loader`) mirrors the brand splash: logo, blue rule,
-"Remapping · Diagnostics · ECU Tuning", the domain, and a sweeping progress
-bar. It shows **once per browsing session** — `sessionStorage` keeps it from
-nagging on every page. It dismisses on `load`, has a minimum display of 1.4s so
-it doesn't flash, a **4-second hard ceiling** so a slow asset can never trap
-anyone, and it can be clicked away. Under `prefers-reduced-motion` the
-animation is dropped entirely.
+### Loader
 
-**Film** (`#film`) is your brand animation, converted from the HEVC `.mov`
-(which doesn't play in Chrome or Firefox) into MP4 + WebM:
+Mirrors the brand splash: logo, blue rule, "Remapping · Diagnostics · ECU
+Tuning", the domain, and a sweeping progress bar.
 
-| | Original | Now |
-|---|---|---|
-| Format | HEVC in .mov | H.264 MP4 + VP9 WebM |
-| Size | 2.6 MB | 575 KB / 615 KB |
-| Support | Safari only | Every browser |
+It runs **on the first load of a browsing session, and again every time the
+home button is pressed** — that's the logo in the header and any `#home` link.
+The element is never removed from the DOM so it can be replayed; the CSS
+animations are restarted by forcing a reflow. Pressing home also scrolls back
+to the top.
 
-Nothing downloads until the section is 300px from the viewport, and playback
-only starts on click — so the video never costs a visitor data they didn't
-choose to spend. Muted by default with an unmute control, plus a
-`VideoObject` schema entry so it can surface in video search.
+Safeguards: a hard timeout always dismisses it, clicking it skips it, and under
+`prefers-reduced-motion` the entry animations are dropped and the display
+shortened.
 
-To swap the film later, replace both files in `assets/video/` keeping the same
-names, and regenerate the poster:
+### Film
 
-```bash
-ffmpeg -i new.mov -vf scale=1280:-2 -c:v libx264 -crf 26 -preset slow \
-  -pix_fmt yuv420p -c:a aac -b:a 96k -movflags +faststart assets/video/jm-intro.mp4
-ffmpeg -i new.mov -vf scale=1280:-2 -c:v libvpx-vp9 -crf 36 -b:v 0 \
-  -c:a libopus assets/video/jm-intro.webm
-ffmpeg -ss 12.5 -i new.mov -frames:v 1 -vf scale=1280:-2 assets/video/jm-intro-poster.jpg
-```
+Your brand animation, converted from the HEVC `.mov` (which plays only in
+Safari) to MP4 + WebM — 2.6 MB down to 575 KB.
 
----
+**It plays by itself when scrolled into view** and pauses when it leaves.
+Autoplay is muted, because every browser requires that; there's an unmute
+button on the video. If autoplay is refused anyway — iOS Low Power Mode, data
+saver, a strict browser setting — the play button appears instead, so the video
+is never simply dead. Under `prefers-reduced-motion` it won't autoplay at all
+and offers the button.
+
+Verified under the browser's default autoplay policy, not a relaxed test flag.
+
+### Cache busting
+
+Every local CSS, JS, video and poster reference carries `?v=3`. Browsers treat
+a changed query string as a new file, so nobody gets served a stale script that
+would break the autoplay or the loader.
+
+**When you change any asset, bump that number** — search and replace `?v=3`
+with `?v=4` across the four HTML files. Without it, returning visitors can sit
+on cached copies for up to a year, because `_headers` and `.htaccess` set
+long cache lifetimes on `/assets/*` (which is what makes the site fast).
 
 ## 10. What this site costs to run
 

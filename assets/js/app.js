@@ -39,40 +39,74 @@ const CONFIG = {
 
 /* ═══════════════════════════════════════════════════════════════
    LOADER
-   Shows once per browsing session. Always dismisses — a hard
-   timeout means a slow asset can never leave someone stuck on it.
+   Runs on first load of a session, and again any time the home
+   button is pressed. The element is never removed from the DOM so
+   it can be replayed. A hard timeout means a slow asset can never
+   leave anyone stuck looking at it.
    ═══════════════════════════════════════════════════════════════ */
 (function () {
   const el = document.getElementById('loader');
   if (!el) return;
 
+  const reduce = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let timers = [];
+  const clear = () => { timers.forEach(clearTimeout); timers = []; };
+
+  function dismiss() {
+    clear();
+    el.classList.add('is-done');
+    el.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('is-loading');
+  }
+
+  function run(minShow) {
+    clear();
+    el.classList.remove('is-done');
+    el.removeAttribute('aria-hidden');
+    document.body.classList.add('is-loading');
+
+    // restart the CSS entry animations
+    el.querySelectorAll('.loader-logo,.loader-rule,.loader-tag,.loader-url').forEach(n => {
+      n.style.animation = 'none';
+      void n.offsetWidth;          // force reflow so the animation replays
+      n.style.animation = '';
+    });
+
+    timers.push(setTimeout(dismiss, minShow));
+    timers.push(setTimeout(dismiss, minShow + 2600));   // hard ceiling
+  }
+
+  el.addEventListener('click', dismiss);   // always skippable
+
+  /* ── first load of the session ── */
   let seen = false;
   try { seen = sessionStorage.getItem('jmSeenLoader') === '1'; } catch (e) { /* private mode */ }
 
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  if (seen) { el.remove(); return; }
-
-  document.body.classList.add('is-loading');
-  let done = false;
-  const dismiss = () => {
-    if (done) return;
-    done = true;
+  if (seen) {
+    dismiss();
+  } else {
     try { sessionStorage.setItem('jmSeenLoader', '1'); } catch (e) {}
-    el.classList.add('is-done');
-    document.body.classList.remove('is-loading');
-    setTimeout(() => el.remove(), 700);
-  };
+    const minShow = reduce() ? 300 : 1600;
+    document.body.classList.add('is-loading');
+    const start = performance.now();
+    const finish = () => run(Math.max(300, minShow - (performance.now() - start)));
+    if (document.readyState === 'complete') finish();
+    else window.addEventListener('load', finish, { once: true });
+    timers.push(setTimeout(dismiss, 4000));
+  }
 
-  const minShow = reduce ? 0 : 1400;
-  const start = performance.now();
-  const finish = () => setTimeout(dismiss, Math.max(0, minShow - (performance.now() - start)));
+  /* ── replay whenever Home is pressed ── */
+  function replay(e) {
+    if (e) e.preventDefault();
+    window.scrollTo({ top: 0, behavior: reduce() ? 'auto' : 'smooth' });
+    run(reduce() ? 300 : 1600);
+  }
 
-  if (document.readyState === 'complete') finish();
-  else window.addEventListener('load', finish, { once: true });
+  document.querySelectorAll('.brand, a[href="#home"]').forEach(a =>
+    a.addEventListener('click', replay)
+  );
 
-  setTimeout(dismiss, 4000);            // hard ceiling
-  el.addEventListener('click', dismiss); // let people skip it
+  window.JMLoader = { replay, dismiss };
 })();
 
 /* ─────────────── helpers ─────────────── */
@@ -591,45 +625,66 @@ form.addEventListener('submit', async (e) => {
 
 /* ═══════════════════════════════════════════════════════════════
    FILM
-   Nothing downloads until the section is in view, and playback
-   only starts when asked — so the video never costs a visitor
-   bandwidth they didn't want to spend.
+   Plays by itself when scrolled into view and pauses when it
+   leaves. Muted, which is what every browser requires for
+   autoplay. If autoplay is refused anyway (iOS Low Power Mode,
+   data saver, a strict setting) the play button is shown instead,
+   so the video is never simply dead.
    ═══════════════════════════════════════════════════════════════ */
 (function () {
-  const video = $('#introVideo');
-  const play  = $('#filmPlay');
-  const sound = $('#filmSound');
+  const video = document.getElementById('introVideo');
+  const play  = document.getElementById('filmPlay');
+  const sound = document.getElementById('filmSound');
   if (!video || !play) return;
 
-  let loaded = false;
-  const load = () => { if (!loaded) { loaded = true; video.preload = 'metadata'; video.load(); } };
+  const frame  = video.closest('.film-frame');
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  if ('IntersectionObserver' in window) {
-    const vo = new IntersectionObserver((es) => {
-      es.forEach(e => { if (e.isIntersecting) { load(); vo.disconnect(); } });
-    }, { rootMargin: '300px' });
-    vo.observe(video);
-  } else load();
+  video.muted = true;               // required for autoplay
+  video.setAttribute('muted', '');
+  video.playsInline = true;
+
+  let userPaused = false;
+
+  function attempt() {
+    if (userPaused) return;
+    const p = video.play();
+    if (p && p.catch) {
+      p.then(() => { play.hidden = true; })
+       .catch(() => { play.hidden = false; });   // autoplay refused — offer the button
+    }
+  }
 
   play.addEventListener('click', () => {
-    load();
-    video.play().then(() => {
-      play.hidden = true;
-      sound.hidden = false;
-      video.controls = true;
-    }).catch(() => { video.controls = true; });
+    userPaused = false;
+    video.play().then(() => { play.hidden = true; }).catch(() => { video.controls = true; });
   });
 
-  const frame = video.closest('.film-frame');
-  video.addEventListener('pause', () => { if (!video.ended) play.hidden = false; });
   video.addEventListener('play',  () => {
-    play.hidden = true; sound.hidden = false;
+    play.hidden = true;
+    sound.hidden = false;
     if (frame) frame.classList.add('is-playing');
   });
+  video.addEventListener('pause', () => { if (!video.ended) play.hidden = false; });
 
   sound.addEventListener('click', () => {
     video.muted = !video.muted;
     sound.classList.toggle('is-on', !video.muted);
     sound.setAttribute('aria-label', video.muted ? 'Unmute the film' : 'Mute the film');
   });
+
+  if (reduce) { play.hidden = false; return; }   // don't autoplay motion for those who opted out
+
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) attempt();
+        else if (!video.paused) { video.pause(); video.muted = true; sound.classList.remove('is-on'); }
+      });
+    }, { threshold: 0.4 });
+    io.observe(video);
+  } else {
+    video.setAttribute('autoplay', '');
+    attempt();
+  }
 })();

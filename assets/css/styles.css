@@ -175,7 +175,7 @@ h1,h2,h3,h4{font-family:var(--f-display);font-weight:800;line-height:1.06;margin
   padding:7px 14px;border-radius:3px;
   color:var(--muted);border:1px solid var(--line-2);background:rgba(255,255,255,.03);
 }
-.spec-tag.is-vag{
+.spec-tag.is-vass{
   color:#fff;border-color:rgba(46,155,255,.55);
   background:linear-gradient(100deg,rgba(10,107,240,.28),rgba(0,49,168,.18));
 }
@@ -397,7 +397,7 @@ h1,h2,h3,h4{font-family:var(--f-display);font-weight:800;line-height:1.06;margin
 }
 .area-list li::before{content:"";position:absolute;left:0;top:14px;width:6px;height:2px;background:var(--blue-hot)}
 .areas-outside{margin-top:32px;color:var(--muted);font-size:17px}
-.areas-outside a,.section-lede a,.answer-text a,.card p a,.about-copy a,.vag-copy a{
+.areas-outside a,.section-lede a,.answer-text a,.card p a,.about-copy a,.vass-copy a{
   text-decoration:underline;text-underline-offset:3px;
 }
 
@@ -426,27 +426,27 @@ h1,h2,h3,h4{font-family:var(--f-display);font-weight:800;line-height:1.06;margin
 .process strong{display:block;font-family:var(--f-display);font-size:19px;text-transform:uppercase;letter-spacing:.05em;color:#fff;margin-bottom:3px}
 .process p{margin:0;color:var(--muted);font-size:16px;line-height:1.55}
 
-/* VAG section */
-.vag-section{position:relative;overflow:hidden;background:var(--ink-2);border-block:1px solid var(--line)}
-.vag-wrap{position:relative;z-index:2;display:grid;grid-template-columns:1fr;gap:34px}
-.vag-copy p{color:var(--muted);margin:0 0 16px}
-.vag-brands{
+/* VASS section */
+.vass-section{position:relative;overflow:hidden;background:var(--ink-2);border-block:1px solid var(--line)}
+.vass-wrap{position:relative;z-index:2;display:grid;grid-template-columns:1fr;gap:34px}
+.vass-copy p{color:var(--muted);margin:0 0 16px}
+.vass-brands{
   display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;margin:0 0 26px;
 }
-.vag-brands li{
+.vass-brands li{
   font-family:var(--f-display);font-weight:700;font-size:15px;
   letter-spacing:.12em;text-transform:uppercase;color:#fff;
   padding:8px 15px;border-radius:3px;
   background:linear-gradient(140deg,rgba(46,155,255,.2),rgba(0,49,168,.16));
   border:1px solid rgba(46,155,255,.42);
 }
-.vag-panel{background:var(--ink-3);border:1px solid var(--line);border-radius:var(--r);padding:26px 24px}
-.vag-panel h3{font-size:21px;text-transform:uppercase;color:#fff;margin-bottom:18px}
-.vag-list{list-style:none;padding:0;margin:0 0 22px;display:grid;gap:14px}
-.vag-list li{padding-left:16px;position:relative}
-.vag-list li::before{content:"";position:absolute;left:0;top:9px;width:7px;height:2px;background:var(--blue-hot)}
-.vag-list strong{display:block;font-family:var(--f-display);font-size:18px;text-transform:uppercase;letter-spacing:.05em;color:#fff}
-.vag-list span{font-size:15.5px;color:var(--muted)}
+.vass-panel{background:var(--ink-3);border:1px solid var(--line);border-radius:var(--r);padding:26px 24px}
+.vass-panel h3{font-size:21px;text-transform:uppercase;color:#fff;margin-bottom:18px}
+.vass-list{list-style:none;padding:0;margin:0 0 22px;display:grid;gap:14px}
+.vass-list li{padding-left:16px;position:relative}
+.vass-list li::before{content:"";position:absolute;left:0;top:9px;width:7px;height:2px;background:var(--blue-hot)}
+.vass-list strong{display:block;font-family:var(--f-display);font-size:18px;text-transform:uppercase;letter-spacing:.05em;color:#fff}
+.vass-list span{font-size:15.5px;color:var(--muted)}
 
 /* Reviews */
 .reviews-empty{
@@ -639,7 +639,7 @@ h1,h2,h3,h4{font-family:var(--f-display);font-weight:800;line-height:1.06;margin
   .cards{grid-template-columns:repeat(2,1fr)}
   .reviews-grid{grid-template-columns:repeat(2,1fr)}
   .reviews-cta{grid-template-columns:auto auto;justify-content:start}
-  .vag-wrap{grid-template-columns:1fr}
+  .vass-wrap{grid-template-columns:1fr}
   .mobile-bar-btn{font-size:18px;min-height:62px}
   .site-footer{padding-bottom:86px}
 }
@@ -669,7 +669,7 @@ h1,h2,h3,h4{font-family:var(--f-display);font-weight:800;line-height:1.06;margin
   .cards{grid-template-columns:repeat(3,1fr)}
   .areas-grid{grid-template-columns:repeat(3,1fr);gap:36px}
   .about-wrap{grid-template-columns:1.15fr .85fr;gap:56px;align-items:start}
-  .vag-wrap{grid-template-columns:1.1fr .9fr;gap:56px;align-items:start}
+  .vass-wrap{grid-template-columns:1.1fr .9fr;gap:56px;align-items:start}
   .reviews-grid{grid-template-columns:repeat(3,1fr)}
   .contact-wrap{grid-template-columns:1fr 1fr;gap:56px;align-items:start}
   .footer-inner{grid-template-columns:1fr 1.3fr;gap:56px}
