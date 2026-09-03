@@ -480,8 +480,8 @@ function resolveFromLookup(found) {
 
   if (n.candidates.length === 1) {
     const c = n.candidates[0];
-    const [label, bhp, nm, type] = DB[c.make][c.model][c.idx];
-    return renderResults({ matched: true, title: `${c.make} ${c.model.replace(/\s*\(.*\)$/, '')} ${label}`, bhp, nm, type }, pendingReg);
+    const [label, bhp, nm, type, verified] = DB[c.make][c.model][c.idx];
+    return renderResults({ matched: true, verified: verified === 1, title: `${c.make} ${c.model.replace(/\s*\(.*\)$/, '')} ${label}`, bhp, nm, type }, pendingReg);
   }
 
   /* a short list — pre-fill make, restrict the model list, let them tap the right one */
@@ -600,8 +600,9 @@ els.selGo.addEventListener('click', () => {
   }
 
   if (!make || !model || idx === '') return;
-  const [label, bhp, nm, type] = DB[make][model][idx];
+  const [label, bhp, nm, type, verified] = DB[make][model][idx];
   renderResults({
+    verified: verified === 1,
     matched : true,
     title   : `${make} ${model.replace(/\s*\(.*\)$/, '')} ${label}`,
     subtitle: model.match(/\((.*)\)/) ? model.match(/\((.*)\)/)[1] : '',
@@ -620,12 +621,18 @@ function renderResults(v, reg) {
   els.resReg.classList.toggle('is-plate', Boolean(reg));
   els.resReg.hidden = false;
   els.resVeh.textContent = v.title;
+  const oldSrc = els.results.querySelector('.fig-source');
+  if (oldSrc) oldSrc.remove();
 
   els.resTable.innerHTML = [
     row('Standard (manufacturer quoted)', v.bhp, v.nm, null, 'is-stock', peak),
     row('Stage 1',  s1.bhp, s1.nm, `+${s1.bhp - v.bhp} PS · +${s1.nm - v.nm} Nm`, 'is-s1', peak),
     row('Stage 2',  s2.bhp, s2.nm, `+${s2.bhp - v.bhp} PS · +${s2.nm - v.nm} Nm`, 'is-s2', peak)
   ].join('');
+
+  els.resVeh.insertAdjacentHTML('afterend', v.verified
+    ? '<p class="fig-source is-ok">Standard figures checked against manufacturer data</p>'
+    : '<p class="fig-source">Standard figures are our best record for this engine \u2014 worth checking against your V5C</p>');
 
   els.resEcon.innerHTML =
     `<strong>${window.JM_TYPE_LABEL[v.type]}.</strong> An economy-focused map on this engine typically returns

@@ -905,3 +905,19 @@ body.is-loading{overflow:hidden}
   .faq-cta{grid-template-columns:1fr;justify-content:center}
   .faq-cta .btn{justify-self:center}
 }
+
+/* Figure provenance */
+.fig-source{
+  font-size:14px;line-height:1.45;color:#6B7484;
+  margin:-8px 0 16px;padding-left:20px;position:relative;
+}
+.fig-source::before{
+  content:"";position:absolute;left:0;top:5px;
+  width:12px;height:12px;border-radius:50%;
+  border:2px solid #C3CBD8;
+}
+.fig-source.is-ok{color:#0B7C3E}
+.fig-source.is-ok::before{
+  border-color:#0B7C3E;background:#0B7C3E;
+  box-shadow:inset 0 0 0 2px #fff;
+}

@@ -156,52 +156,69 @@ full steps.
 
 ---
 
-## 4. Contact form
+## 5. Tuning figures — and how far to trust them
 
-Leave `formEndpoint: null` and the form opens the visitor's email app with
-everything filled in. Works everywhere, zero setup, but a chunk of people on
-phones will bounce off it.
+### Units
 
-Better: sign up for Formspree, Basin or Netlify Forms and paste the endpoint
-in. The form posts JSON and expects a 2xx back.
+The power figure stored is the manufacturer's **PS**, because that is what the
+badge says: a "40 TDI" is 204 PS. The site shows both — "204 PS · 201 bhp" —
+so a customer comparing against their handbook sees a match either way.
+1 PS = 0.98632 bhp. **Do not enter bhp in the database.**
 
----
+### Verified vs unverified
 
-## 5. Tuning figures
+Each engine can carry a fifth value, `1`, marking it as checked against
+manufacturer or authoritative data:
 
-Every number in the checker comes from `JM_GAIN_MODEL` at the top of
-`vehicle-data.js`:
+```js
+["2.0 TDI GTD 184 PS", 184, 380, "td", 1]
+//   label             PS   Nm   type  verified
+```
+
+Verified engines show a green "checked against manufacturer data" line in the
+results. Everything else shows "our best record for this engine — worth
+checking against your V5C". That is deliberate: it is honest, and it invites
+the customer to correct you rather than arrive with wrong expectations.
+
+**Currently 25 of 974 engines are verified.** Those are the ones checked
+directly against manufacturer sources:
+
+| Platform | Source | Result |
+|---|---|---|
+| Audi A5 F5 | audi-mediacenter.com | **4 errors found and fixed** |
+| Audi A4 B9 facelift | audi-mediacenter.com | corrected |
+| VW Golf Mk7 | VW newsroom | correct; 220 PS GTI was missing, added |
+| VW Transporter T6.1 | manufacturer data | all 4 correct |
+| Ford Transit Custom | Ford media spec sheet | all 3 correct |
+
+Three of five platforms were already right, so the database is broadly sound —
+but the A5 had four errors in one model, so it is not uniformly right either.
+
+### Verifying more
+
+The honest position: 974 engines cannot be checked from memory, and the ones
+that matter are the ones that come through the door. Work through your most
+common engines, check each against the manufacturer's own technical data (VW
+newsroom, audi-mediacenter, Ford media, press packs), correct the numbers and
+add `, 1` to the end of that engine's array. The badge updates itself.
+
+Prioritise by what you actually see: Golf, Octavia, Leon, A3, A4, Transporter,
+Transit, Passat, Tiguan. Those are roughly half the work.
+
+### Gain percentages
+
+Every stage figure comes from `JM_GAIN_MODEL` at the top of the file:
 
 ```js
 td:  { s1:{bhp:0.28, nm:0.27}, s2:{bhp:0.38, nm:0.36}, mpg:'8–15%' },
 ```
 
-Percentages per engine type, applied to the stock figures in the database.
-Change these to match what you actually see on your rollers and the whole site
-updates. Adding a vehicle is one line:
-
-```js
-"Golf Mk7 (2012–2020)": [ ["2.0 TDI GTD 184", 184, 380, "td"], ... ]
-//                          label            bhp  Nm   type
-```
+Percentages per engine type, applied to the stock figures. Change these to
+match what you actually see on the rollers and every figure on the site
+updates at once.
 
 Types: `td` turbo diesel, `tp` turbo petrol, `na` naturally aspirated petrol,
 `nad` naturally aspirated diesel.
-
-Models are sorted newest-first inside each make, and every make ends with a
-"Mine isn't listed — ask us" option that jumps to the contact form with the
-make and reg pre-filled. Full hybrids and EVs are deliberately not in the
-database — the scope for conventional ECU tuning is limited and it would be
-dishonest to quote gains for them.
-
-**Keep this file current.** Generation ranges go stale fast. Every year or so,
-add the new generations and change any `(20XX on)` label to a closed range once
-that generation ends. Models are grouped by nameplate with the newest
-generation first, so a customer on a current car sees it immediately.
-
-Anything released after mid-2026 will need adding by hand — check the figures
-against the manufacturer's own spec sheet before you trust them, especially
-on brand-new platforms.
 
 ---
 
