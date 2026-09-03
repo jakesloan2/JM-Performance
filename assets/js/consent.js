@@ -28,7 +28,7 @@
 const ANALYTICS = {
   ga4Id     : null,   // 'G-XXXXXXXXXX'          FREE
   cfToken   : null,   // 'abc123...'             FREE
-  plausible : null    // 'jmperformance.co.uk'   PAID
+  plausible : null    // 'jm-performance.co.uk'   PAID
 };
 
 (function () {

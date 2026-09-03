@@ -25,8 +25,8 @@
    ═══════════════════════════════════════════════════════════════ */
 
 const ALLOWED_ORIGINS = [
-  'https://jmperformance.co.uk',
-  'https://www.jmperformance.co.uk'
+  'https://jm-performance.co.uk',
+  'https://www.jm-performance.co.uk'
 ];
 
 export default {

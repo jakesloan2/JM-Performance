@@ -1,7 +1,14 @@
 /* ═══════════════════════════════════════════════════════════════
    JM PERFORMANCE — vehicle database + gain model
    ---------------------------------------------------------------
-   Engine record format:  [ label, stockBHP, stockNM, typeCode ]
+   Engine record format:  [ label, stockPS, stockNM, typeCode ]
+
+   IMPORTANT — UNITS
+   The power figure is the manufacturer's quoted PS, because that is
+   what the badge on the car says (a "40 TDI" is 204 PS). The site
+   displays PS and converts to bhp alongside it (1 PS = 0.98632 bhp),
+   so a customer comparing against their handbook sees a match.
+   Do not enter bhp here.
 
    Type codes
      td   turbo diesel
@@ -38,11 +45,11 @@ window.JM_VEHICLES = {
     "A6 C8 (2018 on)": [["40 TDI 204",204,400,"td"],["45 TDI 231",231,500,"td"],["50 TDI 286",286,620,"td"],["45 TFSI 245",245,370,"tp"]],
     "Q3 F3 facelift (2023–2025)": [["35 TDI 150",150,340,"td"],["35 TFSI 150",150,250,"tp"],["45 TFSI 245",245,370,"tp"]],
     "Q3 F3 (2018 on)": [["35 TDI 150",150,340,"td"],["40 TDI 190",190,400,"td"],["35 TFSI 150",150,250,"tp"],["45 TFSI 230",230,350,"tp"]],
-    "A4 B9 facelift (2019–2023)": [["30 TDI 136",136,320,"td"],["35 TDI 163",163,380,"td"],["40 TDI 190",190,400,"td"],["35 TFSI 150",150,270,"tp"],["40 TFSI 204",204,320,"tp"]],
+    "A4 B9 facelift (2019–2023)": [["30 TDI 136 PS",136,320,"td"],["35 TDI 163 PS",163,370,"td"],["40 TDI 204 PS",204,400,"td"],["35 TFSI 150 PS",150,270,"tp"],["40 TFSI 204 PS",204,320,"tp"],["45 TFSI 265 PS",265,370,"tp"]],
     "A4 B9 (2015–2023)": [["2.0 TDI 150",150,320,"td"],["2.0 TDI 190",190,400,"td"],["3.0 TDI 272",272,600,"td"],["2.0 TFSI 190",190,320,"tp"],["2.0 TFSI 252",252,370,"tp"]],
     "A1 GB (2018 on)": [["25 TFSI 95",95,175,"tp"],["30 TFSI 110",110,200,"tp"],["35 TFSI 150",150,250,"tp"],["40 TFSI 207",207,320,"tp"]],
     "Q5 FY (2017 on)": [["35 TDI 163",163,380,"td"],["40 TDI 204",204,400,"td"],["45 TFSI 245",245,370,"tp"]],
-    "A5 F5 (2016–2024)": [["35 TDI 163",163,380,"td"],["40 TDI 190",190,400,"td"],["40 TFSI 204",204,320,"tp"],["45 TFSI 245",245,370,"tp"]],
+    "A5 F5 (2016–2024)": [["35 TDI 163 PS",163,370,"td"],["40 TDI 190 PS (2016–2019)",190,400,"td"],["40 TDI 204 PS (2019 on)",204,400,"td"],["35 TFSI 150 PS",150,270,"tp"],["40 TFSI 190 PS (2016–2019)",190,320,"tp"],["40 TFSI 204 PS (2019 on)",204,320,"tp"],["45 TFSI 245 PS (2016–2019)",245,370,"tp"],["45 TFSI 265 PS (2019 on)",265,370,"tp"]],
     "Q2 (2016 on)": [["30 TDI 116",116,300,"td"],["35 TDI 150",150,360,"td"],["30 TFSI 110",110,200,"tp"],["35 TFSI 150",150,250,"tp"]],
     "Q7 (2015 on)": [["45 TDI 231",231,500,"td"],["50 TDI 286",286,600,"td"]],
     "A3 8V (2012–2020)": [["1.6 TDI 110",110,250,"td"],["2.0 TDI 150",150,320,"td"],["2.0 TDI 184",184,380,"td"],["1.4 TFSI 150",150,250,"tp"],["2.0 TFSI 190",190,320,"tp"],["S3 2.0 TFSI 300",300,380,"tp"]],

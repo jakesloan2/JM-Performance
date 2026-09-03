@@ -74,7 +74,7 @@ you get read receipts.
 
 | Find | Replace with |
 |---|---|
-| `https://jmperformance.co.uk` | your real domain (appears in canonical, OG tags and schema) |
+| `https://jm-performance.co.uk` | your real domain (appears in canonical, OG tags and schema) |
 | `+44 28 9100 0000` | real phone number (in the JSON-LD block near the bottom) |
 | `"latitude": 54.4922, "longitude": -5.5372` | **verify these** — right-click the workshop pin in Google Maps and copy the exact coordinates. Mine are approximate for Blackstaff Road. |
 | `"sameAs": []` | `["https://facebook.com/...", "https://instagram.com/..."]` |
@@ -122,75 +122,37 @@ stock file archived, 30-day guarantee.
 
 ---
 
-## 3. Automatic registration lookup — free, and already built
+## 3. Registration lookup — current status
 
-Type a reg and the site looks it up by itself — no Go button needed. Here's
-what actually happens, because the honest version matters:
+**DVLA VES registration is closed.** As of September 2026 the DVLA is not
+accepting new API key applications while it upgrades the system, with no
+reopening date published. Checked at
+register-for-ves.driver-vehicle-licensing.api.gov.uk.
 
-**What the free DVLA API returns:** make, fuel type, engine size (cc), year,
-colour, MOT and tax status. **What it does not return:** the model, or any
-power figure. Paid providers fill that gap; you've said no to paying, which is
-the right call for a new business.
+So the automatic lookup cannot be switched on right now. The code is written
+and waiting — `functions/api/lookup.js` plus `CONFIG.lookupEndpoint` — and
+needs nothing but the key when applications reopen.
 
-**So the site does the clever bit itself.** It takes make + year + fuel +
-engine size from the DVLA and narrows its own 968-engine database down to the
-handful that fit. Tested with a 2021 Audi 2.0 diesel: the lookup found it,
-preselected Audi, and cut the model list to the ten that could actually be that
-car. If only one engine matches, it skips straight to the figures.
+### What runs instead, free, today
 
-The MOT history API (also free) *does* return the model — but it only covers
-DVSA, i.e. Great Britain. Northern Ireland MOTs go through DVA and are not in
-it, so for a Kircubbin business it's no use. Left out deliberately.
+The plate itself carries the year. `SG21` means 2021, and the site reads that
+without any API at all, then offers only the generations on sale around then,
+with everything older tucked below a divider. On a 2021 Audi plate that cuts
+22 models to 11.
 
-### Turning it on — three steps, £0
+So the flow is: type the reg → the year is read → pick make → short list →
+pick engine → figures. Two taps rather than three, at zero cost.
 
-The code is in `functions/api/lookup.js`. It deploys automatically **if the
-site is hosted on Cloudflare Pages** connected to your GitHub repo.
+### Worth knowing before paying anyone
 
-1. **Get a DVLA key** (free, a few working days):
-   https://register-for-ves.driver-vehicle-licensing.api.gov.uk
+Even with a VES key, the DVLA returns **make, fuel, engine size and year — not
+the model and not any power figure.** It would narrow the list further; it
+would never have skipped the picker entirely. Paid providers (UK Vehicle Data,
+CarWeb, VDG) do return model and power, at a per-lookup cost.
 
-2. **Host on Cloudflare Pages** rather than GitHub Pages. dash.cloudflare.com →
-   Workers & Pages → Create → Pages → Connect to Git → pick the repo. Build
-   settings: leave everything blank (no build command, output directory `/`).
-   The `/functions` folder is picked up automatically.
-
-3. **Add the key as a secret:** Pages project → Settings → Environment
-   variables → Add → name `DVLA_API_KEY`, tick *Encrypt*, paste the key → Save.
-   Push any commit (or hit Retry deployment) and it's live.
-
-That's it. Cloudflare Pages is free, Pages Functions are free to 100,000
-requests a day, DVLA VES is free. There's a per-IP rate limit of 30 lookups a
-minute in the function so a bot can't chew through the quota.
-
-### Why not GitHub Pages?
-
-GitHub Pages serves static files only — it can't run code and can't keep a
-secret. The DVLA key has to live on a server, never in front-end JavaScript,
-or anyone can lift it from the page source. Cloudflare Pages does everything
-GitHub Pages does *plus* runs the function, still deploying from the same
-GitHub repo. So GitHub is still the source of truth; Cloudflare just serves
-it.
-
-**On any host without the function** (GitHub Pages, plain FTP), nothing
-breaks — the lookup 404s, the site notices, and drops straight into the manual
-picker with the reg carried across. Tested.
-
-### Behaviour summary
-
-| Situation | What the customer sees |
-|---|---|
-| DVLA match, one engine fits | Straight to Standard / Stage 1 / Stage 2 figures |
-| DVLA match, several fit | "SG21 VXP is a 2021 Audi 2.0 diesel. Which one is yours?" — make preselected, model list trimmed |
-| DVLA has no record | "The DVLA has no record of … Check the plate, or pick below." |
-| Function not deployed | Falls back to the picker, no error shown |
-| Invalid plate | Inline validation, nothing sent |
-
-`autoLookup` in the CONFIG block can be set to `false` if you'd rather it
-waited for Go.
-
-`dvla-proxy-worker.js` is the same thing as a standalone Worker, only needed
-if you host somewhere other than Cloudflare Pages. Ignore it otherwise.
+**Check back every month or two.** When registration reopens: get the key,
+host on Cloudflare Pages, add `DVLA_API_KEY` as a secret. Section 10 has the
+full steps.
 
 ---
 

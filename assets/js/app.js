@@ -286,6 +286,7 @@ const els = {
 
 let pendingReg = null;   // reg carried over from the plate into the picker
 let lastResult = null;   // most recent set of figures, for the booking message
+let regYear    = null;   // year implied by the plate, used to filter the model list
 
 /* ── tabs ── */
 function showTab(name) {
@@ -512,6 +513,7 @@ function resolveFromLookup(found) {
 
 function handoffToPicker(partial) {
   showTab('select');
+  regYear = yearFromReg(pendingReg);
   const make = partial && partial.make ? matchMake(partial.make) : null;
   els.panelSel.querySelector('.checker-lede').textContent =
     partial && partial.notFound
@@ -521,6 +523,11 @@ function handoffToPicker(partial) {
         : `We've got ${pendingReg}. Pick your make, model and engine to see your figures.`;
   if (make) { els.selMake.value = make; els.selMake.dispatchEvent(new Event('change')); els.selModel.focus(); }
   else els.selMake.focus();
+
+  if (regYear) {
+    const note = els.panelSel.querySelector('.checker-lede');
+    note.textContent += ` Showing models on sale around ${regYear}.`;
+  }
 }
 
 /* ── vehicle picker ── */
@@ -538,7 +545,25 @@ els.selMake.addEventListener('change', () => {
   els.selEngine.disabled = true;
   els.selGo.disabled = true;
   if (!make) { els.selModel.disabled = true; return; }
-  Object.keys(DB[make]).forEach(model => els.selModel.append(new Option(model, model)));
+
+  const all = Object.keys(DB[make]);
+
+  /* The plate itself tells us the year — no API needed. Offer the
+     generations on sale then first, with everything else below a
+     divider. ±1 year of slack for build-vs-registration lag. */
+  const fit = regYear
+    ? all.filter(m => { const y = modelYears(m); return !y || (regYear >= y.from - 1 && regYear <= y.to + 1); })
+    : [];
+
+  (fit.length ? fit : all).forEach(m => els.selModel.append(new Option(m, m)));
+
+  if (fit.length && fit.length < all.length) {
+    const div = new Option('\u2014 other years \u2014', '');
+    div.disabled = true;
+    els.selModel.append(div);
+    all.filter(m => !fit.includes(m)).forEach(m => els.selModel.append(new Option(m, m)));
+  }
+
   els.selModel.append(new Option('Mine isn\u2019t listed \u2014 ask us', '__other'));
   els.selModel.disabled = false;
 });
@@ -597,9 +622,9 @@ function renderResults(v, reg) {
   els.resVeh.textContent = v.title;
 
   els.resTable.innerHTML = [
-    row('Standard', v.bhp, v.nm, null, 'is-stock', peak),
-    row('Stage 1',  s1.bhp, s1.nm, `+${s1.bhp - v.bhp} bhp · +${s1.nm - v.nm} Nm`, 'is-s1', peak),
-    row('Stage 2',  s2.bhp, s2.nm, `+${s2.bhp - v.bhp} bhp · +${s2.nm - v.nm} Nm`, 'is-s2', peak)
+    row('Standard (manufacturer quoted)', v.bhp, v.nm, null, 'is-stock', peak),
+    row('Stage 1',  s1.bhp, s1.nm, `+${s1.bhp - v.bhp} PS · +${s1.nm - v.nm} Nm`, 'is-s1', peak),
+    row('Stage 2',  s2.bhp, s2.nm, `+${s2.bhp - v.bhp} PS · +${s2.nm - v.nm} Nm`, 'is-s2', peak)
   ].join('');
 
   els.resEcon.innerHTML =
@@ -619,15 +644,18 @@ function renderResults(v, reg) {
   els.results.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-function row(name, bhp, nm, gain, cls, peak) {
+const PS_TO_BHP = 0.98632;
+const toBhp = ps => Math.round(ps * PS_TO_BHP);
+
+function row(name, ps, nm, gain, cls, peak) {
   return `
   <div class="result-row ${cls}">
     <h4>${name}${gain ? `<span class="result-gain">${gain}</span>` : ''}</h4>
     <div class="result-figs">
-      <div class="result-fig"><b>${bhp}</b><span>bhp</span></div>
+      <div class="result-fig"><b>${ps}</b><span>PS &middot; ${toBhp(ps)} bhp</span></div>
       <div class="result-fig"><b>${nm}</b><span>Nm torque</span></div>
     </div>
-    <div class="result-bar"><i data-w="${Math.round((bhp / peak) * 100)}%"></i></div>
+    <div class="result-bar"><i data-w="${Math.round((ps / peak) * 100)}%"></i></div>
   </div>`;
 }
 
@@ -635,6 +663,7 @@ els.reset.addEventListener('click', () => {
   els.results.hidden = true;
   pendingReg = null;
   lastResult = null;
+  regYear    = null;
   els.regInput.value = '';
   els.selMake.value = ''; els.selMake.dispatchEvent(new Event('change'));
   els.selGo.innerHTML = SEL_GO_LABEL;
