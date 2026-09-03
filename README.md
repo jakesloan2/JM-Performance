@@ -1,9 +1,9 @@
 # JM Performance — landing page
 
-Single-page site for a vehicle tuning and ECU remapping workshop at
-14 Blackstaff Road, Kircubbin, Newtownards BT22 1AQ. Workshop-based only —
-there is no mobile service anywhere in the copy or the structured data.
-Static HTML/CSS/JS, no build step. Drop it on any host.
+Single-page site for a vehicle tuning and ECU remapping business at
+14 Blackstaff Road, Kircubbin, Newtownards BT22 1AQ, offering both workshop
+and mobile remapping across County Down. Static HTML/CSS/JS, no build step.
+Drop it on any host.
 
 ```
 index.html
@@ -122,40 +122,75 @@ stock file archived, 30-day guarantee.
 
 ---
 
-## 3. Turning on real registration lookup
+## 3. Automatic registration lookup — free, and already built
 
-Right now the reg box does three things: validates the plate (current, prefix,
-suffix and NI dateless formats all pass), shows the reg on a yellow plate, then
-hands off to the make/model/engine picker. That is fully functional as-is and
-costs nothing to run.
+Type a reg and the site looks it up by itself — no Go button needed. Here's
+what actually happens, because the honest version matters:
 
-To make it resolve the vehicle automatically you need two data sources:
+**What the free DVLA API returns:** make, fuel type, engine size (cc), year,
+colour, MOT and tax status. **What it does not return:** the model, or any
+power figure. Paid providers fill that gap; you've said no to paying, which is
+the right call for a new business.
 
-**DVLA Vehicle Enquiry Service** — free, apply at
-`developer-portal.driver-vehicle-licensing.api.gov.uk`. Returns make, fuel
-type, engine capacity, colour, year, tax and MOT status. It does **not**
-return the model or any power figures, so on its own it can't drive the
-calculator.
+**So the site does the clever bit itself.** It takes make + year + fuel +
+engine size from the DVLA and narrows its own 968-engine database down to the
+handful that fit. Tested with a 2021 Audi 2.0 diesel: the lookup found it,
+preselected Audi, and cut the model list to the ten that could actually be that
+car. If only one engine matches, it skips straight to the figures.
 
-**A paid vehicle data provider** — UK Vehicle Data, CarWeb, VDG and similar.
-This is where model, variant, bhp and Nm come from. Expect per-lookup pricing.
+The MOT history API (also free) *does* return the model — but it only covers
+DVSA, i.e. Great Britain. Northern Ireland MOTs go through DVA and are not in
+it, so for a Kircubbin business it's no use. Left out deliberately.
 
-`dvla-proxy-worker.js` is a Cloudflare Worker that calls both, keeps your API
-keys server-side and returns one clean JSON object. Deploy it:
+### Turning it on — three steps, £0
 
-```bash
-npm install -g wrangler
-wrangler login
-wrangler deploy dvla-proxy-worker.js --name jm-reg-lookup
-wrangler secret put DVLA_API_KEY
-wrangler secret put UKVD_API_KEY      # optional
-```
+The code is in `functions/api/lookup.js`. It deploys automatically **if the
+site is hosted on Cloudflare Pages** connected to your GitHub repo.
 
-Then set `lookupEndpoint` in `app.js` to the worker URL. Never put an API key
-in front-end JavaScript — anyone can read it in two clicks.
+1. **Get a DVLA key** (free, a few working days):
+   https://register-for-ves.driver-vehicle-licensing.api.gov.uk
 
-If the lookup returns a make but no power figures, the site falls back to the
-picker with the make pre-selected. Nothing breaks.
+2. **Host on Cloudflare Pages** rather than GitHub Pages. dash.cloudflare.com →
+   Workers & Pages → Create → Pages → Connect to Git → pick the repo. Build
+   settings: leave everything blank (no build command, output directory `/`).
+   The `/functions` folder is picked up automatically.
+
+3. **Add the key as a secret:** Pages project → Settings → Environment
+   variables → Add → name `DVLA_API_KEY`, tick *Encrypt*, paste the key → Save.
+   Push any commit (or hit Retry deployment) and it's live.
+
+That's it. Cloudflare Pages is free, Pages Functions are free to 100,000
+requests a day, DVLA VES is free. There's a per-IP rate limit of 30 lookups a
+minute in the function so a bot can't chew through the quota.
+
+### Why not GitHub Pages?
+
+GitHub Pages serves static files only — it can't run code and can't keep a
+secret. The DVLA key has to live on a server, never in front-end JavaScript,
+or anyone can lift it from the page source. Cloudflare Pages does everything
+GitHub Pages does *plus* runs the function, still deploying from the same
+GitHub repo. So GitHub is still the source of truth; Cloudflare just serves
+it.
+
+**On any host without the function** (GitHub Pages, plain FTP), nothing
+breaks — the lookup 404s, the site notices, and drops straight into the manual
+picker with the reg carried across. Tested.
+
+### Behaviour summary
+
+| Situation | What the customer sees |
+|---|---|
+| DVLA match, one engine fits | Straight to Standard / Stage 1 / Stage 2 figures |
+| DVLA match, several fit | "SG21 VXP is a 2021 Audi 2.0 diesel. Which one is yours?" — make preselected, model list trimmed |
+| DVLA has no record | "The DVLA has no record of … Check the plate, or pick below." |
+| Function not deployed | Falls back to the picker, no error shown |
+| Invalid plate | Inline validation, nothing sent |
+
+`autoLookup` in the CONFIG block can be set to `false` if you'd rather it
+waited for Go.
+
+`dvla-proxy-worker.js` is the same thing as a standalone Worker, only needed
+if you host somewhere other than Cloudflare Pages. Ignore it otherwise.
 
 ---
 
@@ -243,10 +278,10 @@ on brand-new platforms.
 1. Claim and fill out the Google Business Profile — for a local trade this
    moves the needle harder than anything on the page
 2. Get listed on the Google Maps pin with real photos of the unit and the kit
-3. Build individual town pages (`/newtownards-remapping/`, `/bangor-remapping/`)
-   once the main page is indexed — the current page targets the county, town
-   pages target the town. Write them as "drivers from X come to us", not
-   "we cover X", so they stay honest about being workshop-based
+3. Build individual town pages (`/mobile-remapping-newtownards/`,
+   `/remapping-bangor/`) once the main page is indexed. "Mobile car remapping
+   [town]" is a high-intent, low-competition search and now genuinely true —
+   it is probably the single biggest SEO opportunity left
 4. Add real before/after dyno graphs; they earn links and dwell time
 
 ---

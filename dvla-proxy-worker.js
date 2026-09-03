@@ -1,5 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════
-   JM PERFORMANCE — registration lookup proxy (Cloudflare Worker)
+   JM PERFORMANCE — registration lookup proxy (standalone Worker)
+   ---------------------------------------------------------------
+   ONLY NEEDED if you host somewhere other than Cloudflare Pages.
+   On Cloudflare Pages, /functions/api/lookup.js does this job
+   automatically — ignore this file.
    ---------------------------------------------------------------
    Your API keys must never sit in front-end JavaScript. This little
    worker keeps them server-side and gives the site a single, safe

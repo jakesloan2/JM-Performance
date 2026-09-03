@@ -26,11 +26,16 @@ const CONFIG = {
   reviewUrl : null,
 
   /* Reg lookup endpoint.
-     Leave null and the checker falls back to the manual vehicle
-     picker (still fully functional).
-     Set it to your own server route (see /dvla-proxy-worker.js and
-     README.md) to turn on true registration lookup.                 */
-  lookupEndpoint : null,
+     'api/lookup' is the Cloudflare Pages Function in /functions — it
+     goes live automatically when the site is hosted on Cloudflare
+     Pages and the DVLA key is added as a secret (see README §3).
+     On any host without it (GitHub Pages, plain FTP) the call 404s
+     and the checker quietly falls back to the manual picker.        */
+  lookupEndpoint : 'api/lookup',
+
+  /* Fire the lookup automatically once a valid reg has been typed,
+     without needing the Go button. Set false to require Go.         */
+  autoLookup : true,
 
   /* Where the contact form posts. Leave null for a mailto: fallback.
      Works out of the box with Formspree, Basin, Netlify Forms etc.   */
@@ -344,89 +349,181 @@ function regFail(msg) {
   els.regInput.focus();
 }
 
-els.regGo.addEventListener('click', async () => {
+const DB = window.JM_VEHICLES || {};
+const GO_LABEL = els.regGo.innerHTML;
+let lookupSeq = 0;
+
+async function runLookup() {
   const raw = els.regInput.value.trim();
-  if (!raw)            return regFail('Enter your registration to see your figures.');
+  if (!raw)             return regFail('Enter your registration to see your figures.');
   if (!isValidReg(raw)) return regFail("That doesn't look like a UK registration. Check and try again.");
 
+  const seq = ++lookupSeq;
   pendingReg = prettyReg(raw);
   els.regGo.disabled = true;
   els.regGo.textContent = 'Checking…';
+  els.regError.hidden = true;
 
   try {
-    const vehicle = await lookupReg(cleanReg(raw));
-    if (vehicle && vehicle.matched) {
-      renderResults(vehicle, pendingReg);
-    } else {
-      handoffToPicker(vehicle);
-    }
+    const found = await lookupReg(cleanReg(raw));
+    if (seq !== lookupSeq) return;                 // a newer lookup superseded this one
+    resolveFromLookup(found);
   } catch (err) {
-    console.warn('Reg lookup failed:', err);
+    console.warn('Reg lookup:', err);
+    if (seq !== lookupSeq) return;
     handoffToPicker(null);
   } finally {
-    els.regGo.disabled = false;
-    els.regGo.innerHTML = 'Go <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    if (seq === lookupSeq) { els.regGo.disabled = false; els.regGo.innerHTML = GO_LABEL; }
   }
+}
+
+els.regGo.addEventListener('click', runLookup);
+
+/* Auto-run once typing pauses on a valid reg */
+let autoTimer = null;
+els.regInput.addEventListener('input', () => {
+  if (!CONFIG.autoLookup) return;
+  clearTimeout(autoTimer);
+  const v = cleanReg(els.regInput.value);
+  if (v.length >= 6 && isValidReg(v)) autoTimer = setTimeout(runLookup, 900);
 });
 
 /**
- * Look up a registration.
- * With CONFIG.lookupEndpoint set, POSTs { registrationNumber } and expects:
- *   { make, model, engine, fuelType, yearOfManufacture, enginePowerBhp, enginePowerNm }
- * Returns an object with matched:true when there's enough to calculate figures.
+ * Ask the server what the DVLA knows about this reg.
+ * Returns null when there is no endpoint (or it 404s) so the caller
+ * falls back to the manual picker without fuss.
  */
 async function lookupReg(reg) {
   if (!CONFIG.lookupEndpoint) return null;
-
-  const res = await fetch(CONFIG.lookupEndpoint, {
-    method  : 'POST',
-    headers : { 'Content-Type': 'application/json' },
-    body    : JSON.stringify({ registrationNumber: reg })
-  });
-  if (!res.ok) throw new Error('Lookup returned ' + res.status);
-  const d = await res.json();
-
-  const type = inferType(d);
-  const bhp  = Number(d.enginePowerBhp) || null;
-  const nm   = Number(d.enginePowerNm)  || (bhp ? Math.round(bhp * (type === 'td' ? 2.2 : 1.5)) : null);
-
-  if (!bhp || !nm) {
-    return { matched: false, make: d.make || null, year: d.yearOfManufacture || null, raw: d };
-  }
-  return {
-    matched : true,
-    title   : [d.yearOfManufacture, d.make, d.model, d.engine].filter(Boolean).join(' '),
-    bhp, nm, type
-  };
+  let res;
+  try {
+    res = await fetch(CONFIG.lookupEndpoint, {
+      method  : 'POST',
+      headers : { 'Content-Type': 'application/json' },
+      body    : JSON.stringify({ registrationNumber: reg })
+    });
+  } catch (e) { return null; }                     // offline / blocked
+  if (res.status === 404 && !(res.headers.get('content-type') || '').includes('json')) return null; // no function here
+  if (res.status === 404) return { notFound: true };
+  if (!res.ok) return null;
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('json')) return null;
+  return res.json();
 }
 
-function inferType(d) {
-  const fuel = (d.fuelType || '').toUpperCase();
-  const eng  = (d.engine || d.model || '').toUpperCase();
-  const diesel = fuel.includes('DIESEL') || /TDI|HDI|CDTI|DCI|TDCI|CRDI|BLUEHDI|MULTIJET|D-4D|SKYACTIV-D|ECOBLUE/.test(eng);
-  const forced = /TURBO|TSI|TFSI|TDI|HDI|CDTI|DCI|TDCI|CRDI|T-GDI|ECOBOOST|THP|TCE|MULTIJET|BITURBO|SUPERCHARGED/.test(eng)
-                 || diesel;
-  if (diesel) return forced ? 'td' : 'nad';
-  return forced ? 'tp' : 'na';
+/* ───────────────────────────────────────────────────────────────
+   Narrow the database using whatever the DVLA gave us.
+   make + year + fuel + engine size is usually enough to land on
+   one engine, or a very short list.
+   ─────────────────────────────────────────────────────────────── */
+function fuelIsDiesel(f) { return /DIESEL/i.test(f || ''); }
+function typeIsDiesel(t) { return t === 'td' || t === 'nad'; }
+
+function modelYears(label) {
+  const m = label.match(/\((\d{4})(?:[–-](\d{4}))?/);
+  if (!m) return null;
+  return { from: +m[1], to: m[2] ? +m[2] : 2100 };
+}
+
+function engineLitres(label) {
+  const m = label.match(/(\d\.\d)/);
+  return m ? parseFloat(m[1]) : null;
+}
+
+function matchMake(dvlaMake) {
+  const key = (dvlaMake || '').toUpperCase().replace(/[^A-Z]/g, '');
+  if (!key) return null;
+  const aliases = { VOLKSWAGEN: 'Volkswagen', VW: 'Volkswagen', MERCEDES: 'Mercedes-Benz', MERCEDESBENZ: 'Mercedes-Benz',
+                    SKODA: 'Škoda', CITROEN: 'Citroën', LANDROVER: 'Land Rover', RANGEROVER: 'Land Rover',
+                    CUPRA: 'SEAT', DS: 'Citroën', VAUXHALL: 'Vauxhall', OPEL: 'Vauxhall' };
+  if (aliases[key]) return aliases[key];
+  return Object.keys(DB).find(m => m.toUpperCase().replace(/[^A-Z]/g, '') === key)
+      || Object.keys(DB).find(m => key.includes(m.toUpperCase().replace(/[^A-Z]/g, '')))
+      || null;
+}
+
+function narrow(d) {
+  const make = matchMake(d.make);
+  if (!make) return { make: null, candidates: [] };
+
+  const year   = Number(d.yearOfManufacture) || null;
+  const diesel = fuelIsDiesel(d.fuelType);
+  const cc     = Number(d.engineCapacity) || null;
+  const litres = cc ? Math.round(cc / 100) / 10 : null;
+
+  let cands = [];
+  Object.keys(DB[make]).forEach(model => {
+    const yrs = modelYears(model);
+    if (year && yrs && (year < yrs.from - 1 || year > yrs.to + 1)) return;   // ±1 for reg-vs-build lag
+    DB[make][model].forEach((eng, i) => {
+      if (d.fuelType && typeIsDiesel(eng[3]) !== diesel) return;
+      cands.push({ make, model, idx: i, label: eng[0], litres: engineLitres(eng[0]) });
+    });
+  });
+
+  if (litres) {
+    const tight = cands.filter(c => c.litres === null || Math.abs(c.litres - litres) < 0.15);
+    if (tight.length) cands = tight;
+  }
+  return { make, year, litres, diesel, candidates: cands };
+}
+
+function resolveFromLookup(found) {
+  if (!found || found.notFound || !found.make) return handoffToPicker(found);
+
+  const n = narrow(found);
+  if (!n.make) return handoffToPicker(found);
+
+  const desc = [n.year, n.make, n.litres ? n.litres.toFixed(1) : null, found.fuelType ? found.fuelType.toLowerCase() : null]
+                 .filter(Boolean).join(' ');
+
+  if (n.candidates.length === 1) {
+    const c = n.candidates[0];
+    const [label, bhp, nm, type] = DB[c.make][c.model][c.idx];
+    return renderResults({ matched: true, title: `${c.make} ${c.model.replace(/\s*\(.*\)$/, '')} ${label}`, bhp, nm, type }, pendingReg);
+  }
+
+  /* a short list — pre-fill make, restrict the model list, let them tap the right one */
+  showTab('select');
+  els.panelSel.querySelector('.checker-lede').textContent =
+    n.candidates.length
+      ? `${pendingReg} is a ${desc}. Which one is yours?`
+      : `${pendingReg} is a ${desc}. Pick the model and engine below.`;
+
+  els.selMake.value = n.make;
+  els.selMake.dispatchEvent(new Event('change'));
+
+  if (n.candidates.length) {
+    const models = [...new Set(n.candidates.map(c => c.model))];
+    [...els.selModel.options].forEach(o => { if (o.value && o.value !== '__other' && !models.includes(o.value)) o.hidden = true; });
+    if (models.length === 1) {
+      els.selModel.value = models[0];
+      els.selModel.dispatchEvent(new Event('change'));
+      const idxs = n.candidates.map(c => String(c.idx));
+      [...els.selEngine.options].forEach(o => { if (o.value && !idxs.includes(o.value)) o.hidden = true; });
+      els.selEngine.focus();
+    } else {
+      els.selModel.focus();
+    }
+  } else {
+    els.selModel.focus();
+  }
 }
 
 function handoffToPicker(partial) {
   showTab('select');
-  const note = partial && partial.make
-    ? `We found ${pendingReg}${partial.year ? ' (' + partial.year + ')' : ''}. Confirm the model and engine below.`
-    : `We've got ${pendingReg}. Pick your make, model and engine to see your figures.`;
-  els.panelSel.querySelector('.checker-lede').textContent = note;
-
-  if (partial && partial.make) {
-    const match = Object.keys(window.JM_VEHICLES)
-      .find(m => m.toUpperCase().replace(/[^A-Z]/g, '').includes(partial.make.toUpperCase().replace(/[^A-Z]/g, '')));
-    if (match) { els.selMake.value = match; els.selMake.dispatchEvent(new Event('change')); }
-  }
-  els.selMake.focus();
+  const make = partial && partial.make ? matchMake(partial.make) : null;
+  els.panelSel.querySelector('.checker-lede').textContent =
+    partial && partial.notFound
+      ? `The DVLA has no record of ${pendingReg}. Check the plate, or pick your vehicle below.`
+      : make
+        ? `We found ${pendingReg}${partial.yearOfManufacture ? ' (' + partial.yearOfManufacture + ')' : ''}. Confirm the model and engine below.`
+        : `We've got ${pendingReg}. Pick your make, model and engine to see your figures.`;
+  if (make) { els.selMake.value = make; els.selMake.dispatchEvent(new Event('change')); els.selModel.focus(); }
+  else els.selMake.focus();
 }
 
 /* ── vehicle picker ── */
-const DB = window.JM_VEHICLES || {};
 const SEL_GO_LABEL = els.selGo.innerHTML;
 
 Object.keys(DB).sort((a, b) => a.localeCompare(b, 'en')).forEach(make => {
